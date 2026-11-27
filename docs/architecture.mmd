@@ -1,0 +1,15 @@
+flowchart LR
+  UI[React SOC Dashboard] --> GW[NGINX API Gateway]
+  GW --> ING[Log Ingestion]
+  GW --> DET[Threat Detection]
+  GW --> TI[Threat Intelligence]
+  GW --> INC[Incident Management]
+  ING --> DB1[(ingestion_db)]
+  DET --> DB2[(detection_db)]
+  TI --> DB3[(intelligence_db)]
+  INC --> DB4[(incident_db)]
+  ING -- LogReceived / async --> MQ[(RabbitMQ)]
+  MQ -- log.received --> DET
+  DET -- REST / sync + breaker --> TI
+  DET -- ThreatDetected / async --> MQ
+  MQ -- threat.detected --> INC

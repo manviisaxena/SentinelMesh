@@ -1,0 +1,131 @@
+apiVersion: v1
+kind: Service
+metadata: {name: db-ingestion}
+spec: {clusterIP: None, selector: {app: db-ingestion}, ports: [{port: 5432, targetPort: 5432}]}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: db-ingestion}
+spec:
+  serviceName: db-ingestion
+  replicas: 1
+  selector: {matchLabels: {app: db-ingestion}}
+  template:
+    metadata: {labels: {app: db-ingestion}}
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16-alpine
+        env:
+        - {name: POSTGRES_DB, value: ingestion_db}
+        - {name: POSTGRES_USER, valueFrom: {secretKeyRef: {name: sentinel-secrets, key: POSTGRES_USER}}}
+        - {name: POSTGRES_PASSWORD, valueFrom: {secretKeyRef: {name: sentinel-secrets, key: POSTGRES_PASSWORD}}}
+        ports: [{containerPort: 5432}]
+        volumeMounts: [{name: data, mountPath: /var/lib/postgresql/data}]
+        readinessProbe: {exec: {command: [sh, -c, 'pg_isready -U "$POSTGRES_USER" -d ingestion_db']}, initialDelaySeconds: 5, periodSeconds: 5}
+        livenessProbe: {exec: {command: [sh, -c, 'pg_isready -U "$POSTGRES_USER" -d ingestion_db']}, initialDelaySeconds: 20, periodSeconds: 10}
+        resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {cpu: 500m, memory: 512Mi}}
+  volumeClaimTemplates:
+  - metadata: {name: data}
+    spec:
+      accessModes: [ReadWriteOnce]
+      resources: {requests: {storage: 1Gi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: db-detection}
+spec: {clusterIP: None, selector: {app: db-detection}, ports: [{port: 5432, targetPort: 5432}]}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: db-detection}
+spec:
+  serviceName: db-detection
+  replicas: 1
+  selector: {matchLabels: {app: db-detection}}
+  template:
+    metadata: {labels: {app: db-detection}}
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16-alpine
+        env:
+        - {name: POSTGRES_DB, value: detection_db}
+        - {name: POSTGRES_USER, valueFrom: {secretKeyRef: {name: sentinel-secrets, key: POSTGRES_USER}}}
+        - {name: POSTGRES_PASSWORD, valueFrom: {secretKeyRef: {name: sentinel-secrets, key: POSTGRES_PASSWORD}}}
+        ports: [{containerPort: 5432}]
+        volumeMounts: [{name: data, mountPath: /var/lib/postgresql/data}]
+        readinessProbe: {exec: {command: [sh, -c, 'pg_isready -U "$POSTGRES_USER" -d detection_db']}, initialDelaySeconds: 5, periodSeconds: 5}
+        livenessProbe: {exec: {command: [sh, -c, 'pg_isready -U "$POSTGRES_USER" -d detection_db']}, initialDelaySeconds: 20, periodSeconds: 10}
+        resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {cpu: 500m, memory: 512Mi}}
+  volumeClaimTemplates:
+  - metadata: {name: data}
+    spec:
+      accessModes: [ReadWriteOnce]
+      resources: {requests: {storage: 1Gi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: db-intelligence}
+spec: {clusterIP: None, selector: {app: db-intelligence}, ports: [{port: 5432, targetPort: 5432}]}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: db-intelligence}
+spec:
+  serviceName: db-intelligence
+  replicas: 1
+  selector: {matchLabels: {app: db-intelligence}}
+  template:
+    metadata: {labels: {app: db-intelligence}}
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16-alpine
+        env:
+        - {name: POSTGRES_DB, value: intelligence_db}
+        - {name: POSTGRES_USER, valueFrom: {secretKeyRef: {name: sentinel-secrets, key: POSTGRES_USER}}}
+        - {name: POSTGRES_PASSWORD, valueFrom: {secretKeyRef: {name: sentinel-secrets, key: POSTGRES_PASSWORD}}}
+        ports: [{containerPort: 5432}]
+        volumeMounts: [{name: data, mountPath: /var/lib/postgresql/data}]
+        readinessProbe: {exec: {command: [sh, -c, 'pg_isready -U "$POSTGRES_USER" -d intelligence_db']}, initialDelaySeconds: 5, periodSeconds: 5}
+        livenessProbe: {exec: {command: [sh, -c, 'pg_isready -U "$POSTGRES_USER" -d intelligence_db']}, initialDelaySeconds: 20, periodSeconds: 10}
+        resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {cpu: 500m, memory: 512Mi}}
+  volumeClaimTemplates:
+  - metadata: {name: data}
+    spec:
+      accessModes: [ReadWriteOnce]
+      resources: {requests: {storage: 1Gi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: db-incident}
+spec: {clusterIP: None, selector: {app: db-incident}, ports: [{port: 5432, targetPort: 5432}]}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: db-incident}
+spec:
+  serviceName: db-incident
+  replicas: 1
+  selector: {matchLabels: {app: db-incident}}
+  template:
+    metadata: {labels: {app: db-incident}}
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16-alpine
+        env:
+        - {name: POSTGRES_DB, value: incident_db}
+        - {name: POSTGRES_USER, valueFrom: {secretKeyRef: {name: sentinel-secrets, key: POSTGRES_USER}}}
+        - {name: POSTGRES_PASSWORD, valueFrom: {secretKeyRef: {name: sentinel-secrets, key: POSTGRES_PASSWORD}}}
+        ports: [{containerPort: 5432}]
+        volumeMounts: [{name: data, mountPath: /var/lib/postgresql/data}]
+        readinessProbe: {exec: {command: [sh, -c, 'pg_isready -U "$POSTGRES_USER" -d incident_db']}, initialDelaySeconds: 5, periodSeconds: 5}
+        livenessProbe: {exec: {command: [sh, -c, 'pg_isready -U "$POSTGRES_USER" -d incident_db']}, initialDelaySeconds: 20, periodSeconds: 10}
+        resources: {requests: {cpu: 50m, memory: 128Mi}, limits: {cpu: 500m, memory: 512Mi}}
+  volumeClaimTemplates:
+  - metadata: {name: data}
+    spec:
+      accessModes: [ReadWriteOnce]
+      resources: {requests: {storage: 1Gi}}

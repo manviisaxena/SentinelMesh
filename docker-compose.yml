@@ -1,0 +1,76 @@
+services:
+  db-ingestion:
+    image: postgres:16-alpine
+    environment: {POSTGRES_DB: ingestion_db, POSTGRES_USER: sentinel, POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-change-me-local}"}
+    volumes: [ingestion-data:/var/lib/postgresql/data]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U sentinel -d ingestion_db"], interval: 5s, timeout: 3s, retries: 20}
+    networks: [sentinel]
+  db-detection:
+    image: postgres:16-alpine
+    environment: {POSTGRES_DB: detection_db, POSTGRES_USER: sentinel, POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-change-me-local}"}
+    volumes: [detection-data:/var/lib/postgresql/data]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U sentinel -d detection_db"], interval: 5s, timeout: 3s, retries: 20}
+    networks: [sentinel]
+  db-intelligence:
+    image: postgres:16-alpine
+    environment: {POSTGRES_DB: intelligence_db, POSTGRES_USER: sentinel, POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-change-me-local}"}
+    volumes: [intelligence-data:/var/lib/postgresql/data]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U sentinel -d intelligence_db"], interval: 5s, timeout: 3s, retries: 20}
+    networks: [sentinel]
+  db-incident:
+    image: postgres:16-alpine
+    environment: {POSTGRES_DB: incident_db, POSTGRES_USER: sentinel, POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-change-me-local}"}
+    volumes: [incident-data:/var/lib/postgresql/data]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U sentinel -d incident_db"], interval: 5s, timeout: 3s, retries: 20}
+    networks: [sentinel]
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment: {RABBITMQ_DEFAULT_USER: "${RABBITMQ_USER:-sentinel}", RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASSWORD:-sentinel-local}"}
+    ports: ["15672:15672"]
+    healthcheck: {test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"], interval: 5s, timeout: 5s, retries: 20}
+    networks: [sentinel]
+  ingestion:
+    build: {context: ., dockerfile: services/ingestion/Dockerfile}
+    environment: {DATABASE_URL: "postgresql://sentinel:${POSTGRES_PASSWORD:-change-me-local}@db-ingestion:5432/ingestion_db", AMQP_URL: "amqp://${RABBITMQ_USER:-sentinel}:${RABBITMQ_PASSWORD:-sentinel-local}@rabbitmq:5672/%2F"}
+    depends_on: {db-ingestion: {condition: service_healthy}, rabbitmq: {condition: service_healthy}}
+    healthcheck: {test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"], interval: 10s, timeout: 3s, retries: 10}
+    networks: [sentinel]
+  detection:
+    build: {context: ., dockerfile: services/detection/Dockerfile}
+    environment: {DATABASE_URL: "postgresql://sentinel:${POSTGRES_PASSWORD:-change-me-local}@db-detection:5432/detection_db", AMQP_URL: "amqp://${RABBITMQ_USER:-sentinel}:${RABBITMQ_PASSWORD:-sentinel-local}@rabbitmq:5672/%2F", INTELLIGENCE_URL: http://intelligence:8003}
+    depends_on: {db-detection: {condition: service_healthy}, rabbitmq: {condition: service_healthy}, intelligence: {condition: service_healthy}}
+    healthcheck: {test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"], interval: 10s, timeout: 3s, retries: 10}
+    networks: [sentinel]
+  intelligence:
+    build: {context: ., dockerfile: services/intelligence/Dockerfile}
+    environment: {DATABASE_URL: "postgresql://sentinel:${POSTGRES_PASSWORD:-change-me-local}@db-intelligence:5432/intelligence_db"}
+    depends_on: {db-intelligence: {condition: service_healthy}}
+    healthcheck: {test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"], interval: 10s, timeout: 3s, retries: 10}
+    networks: [sentinel]
+  incident:
+    build: {context: ., dockerfile: services/incident/Dockerfile}
+    environment: {DATABASE_URL: "postgresql://sentinel:${POSTGRES_PASSWORD:-change-me-local}@db-incident:5432/incident_db", AMQP_URL: "amqp://${RABBITMQ_USER:-sentinel}:${RABBITMQ_PASSWORD:-sentinel-local}@rabbitmq:5672/%2F"}
+    depends_on: {db-incident: {condition: service_healthy}, rabbitmq: {condition: service_healthy}}
+    healthcheck: {test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"], interval: 10s, timeout: 3s, retries: 10}
+    networks: [sentinel]
+  gateway:
+    build: {context: ., dockerfile: gateway/Dockerfile}
+    ports: ["8081:80"]
+    depends_on:
+      ingestion: {condition: service_healthy}
+      detection: {condition: service_healthy}
+      intelligence: {condition: service_healthy}
+      incident: {condition: service_healthy}
+    networks: [sentinel]
+  frontend:
+    build: ./frontend
+    networks: [sentinel]
+    depends_on: [gateway]
+
+volumes:
+  ingestion-data: {}
+  detection-data: {}
+  intelligence-data: {}
+  incident-data: {}
+networks:
+  sentinel: {driver: bridge}
